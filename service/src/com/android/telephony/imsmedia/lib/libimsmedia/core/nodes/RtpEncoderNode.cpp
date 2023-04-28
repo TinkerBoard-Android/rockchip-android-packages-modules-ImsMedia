@@ -36,6 +36,7 @@ RtpEncoderNode::RtpEncoderNode(BaseSessionCallback* callback) :
     mRtpTxDtmfPayload = 0;
     mRtpRxDtmfPayload = 0;
     mDtmfSamplingRate = 0;
+    mDtmfTimestamp = 0;
     mCvoValue = CVO_DEFINE_NONE;
     mRedundantLevel = 0;
     mRedundantPayload = 0;
@@ -289,7 +290,7 @@ bool RtpEncoderNode::SetCvoExtension(const int64_t facing, const int64_t orienta
     IMLOGD3("[SetCvoExtension] cvoValue[%d], facing[%ld], orientation[%ld]", mCvoValue, facing,
             orientation);
 
-    if (mCvoValue != -1)
+    if (mCvoValue > 0)
     {
         uint32_t rotation = 0;
         uint32_t cameraId = 0;
@@ -446,18 +447,16 @@ bool RtpEncoderNode::ProcessAudioData(ImsMediaSubType subtype, uint8_t* data, ui
                 return false;
             }
 
+            mMark ? mDtmfTimestamp = currentTimestamp : timeDiff = 0;
             mPrevTimestamp = currentTimestamp;
             timestampDiff = timeDiff * mSamplingRate;
 
-            IMLOGD_PACKET2(IM_PACKET_LOG_RTP, "[ProcessAudioData] dtmf payload, size[%u], TS[%u]",
-                    size, currentTimestamp);
+            IMLOGD_PACKET3(IM_PACKET_LOG_RTP,
+                    "[ProcessAudioData] dtmf payload, size[%u], TS[%u], diff[%d]", size,
+                    mDtmfTimestamp, timestampDiff);
             mRtpSession->SendRtpPacket(
-                    mRtpTxDtmfPayload, data, size, currentTimestamp, mMark, timestampDiff);
-
-            if (mMark)
-            {
-                mMark = false;
-            }
+                    mRtpTxDtmfPayload, data, size, mDtmfTimestamp, mMark, timestampDiff);
+            mMark = false;
         }
     }
     else  // MEDIASUBTYPE_RTPPAYLOAD
@@ -495,8 +494,8 @@ bool RtpEncoderNode::ProcessAudioData(ImsMediaSubType subtype, uint8_t* data, ui
                     kCollectPacketInfo, kStreamRtpTx, reinterpret_cast<uint64_t>(packet));
 
             timestampDiff = timeDiff * mSamplingRate;
-            IMLOGD_PACKET3(IM_PACKET_LOG_RTP, "[ProcessAudioData] PayloadTx[%d], Size[%d], TS[%d]",
-                    mRtpPayloadTx, size, currentTimestamp);
+            IMLOGD_PACKET3(IM_PACKET_LOG_RTP, "[ProcessAudioData] size[%u], TS[%u], diff[%d]", size,
+                    currentTimestamp, timestampDiff);
 
             if (!mListRtpExtension.empty())
             {
